@@ -1,0 +1,43 @@
+| dbxquery 
+connection="ngp_connection" 
+timeout=1800 query="
+SELECT   to_timestamp(floor((extract('epoch' from now()) / 900 )) * 900) AT TIME ZONE 'GMT' as bucket_gmt,
+         to_timestamp(floor((extract('epoch' from now()) / 900 )) * 900) AT TIME ZONE 'CST6CDT' as bucket_cst6cdt,
+         'prudential' as customer,
+         'outbound_intl_duration' as alert_type,
+         count(guid) as calls,
+         COALESCE(sum(duration_c),0) as duration_calculated_minutes
+FROM
+(
+SELECT   a.guid,
+         a.sourcenumber,
+         a.destinationnumber,
+         a.destinationregion,
+         to_timestamp(a.flowtime/1000) as starttime,
+         to_timestamp(b.flowtime/1000) as endtime,
+         ROUND(b.duration/1000/60::numeric,1) as duration_a,
+         CASE
+            WHEN b.flowtime IS NULL THEN ROUND(((EXTRACT(EPOCH FROM now())*1000-a.flowtime)/1000/60::numeric)::numeric,1)
+            ELSE ROUND((b.flowtime-a.flowtime)/1000/60::numeric,1)
+         END as duration_c
+FROM     master.flowstart a LEFT OUTER JOIN master.flowend b ON a.guid=b.guid
+WHERE    a.routername LIKE 'sip%' AND
+         a.direction = 2 AND
+         a.destinationregion NOT IN ('United States') AND
+         a.analyticstime >= (extract (epoch from now() - INTERVAL '15 MINUTE') * 1000)::bigint AND
+         a.guid NOT IN 
+         (
+         SELECT guid 
+         FROM   master.policyflowdetails s
+         WHERE  s.analyticstime >= (extract (epoch from now() - INTERVAL '15 MINUTES') * 1000)::bigint AND
+                s.policydisposition = 2
+         ) AND
+         a.sourcenumber NOT IN
+         (
+         SELECT distinct a.value
+         FROM   master.listing a JOIN master.listinggroup b ON a.listinggroupid=b.id
+         WHERE  b.name IN ('Whitelist','Graylist')
+         )
+) t
+" shortnames=t
+| table bucket_gmt bucket_cst6cdt customer alert_type calls duration_calculated_minutes
