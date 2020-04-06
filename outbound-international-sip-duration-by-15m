@@ -44,13 +44,13 @@ FROM     master.flowstart a LEFT OUTER JOIN master.flowend b ON a.guid=b.guid
 WHERE    a.routername LIKE 'sip%' AND
          a.direction = 2 AND
          a.destinationregion NOT IN ('United States') AND
-         a.analyticstime >= (extract (epoch from now() - INTERVAL '15 MINUTE') * 1000)::bigint AND
+         a.analyticstime >= (extract (epoch from now() - INTERVAL '180 MINUTE') * 1000)::bigint AND
          a.analyticstime  < (extract (epoch from now() - INTERVAL  '0 MINUTE') * 1000)::bigint AND
          a.guid NOT IN 
          (
          SELECT guid 
          FROM   master.policyflowdetails s
-         WHERE  s.analyticstime >= (extract (epoch from now() - INTERVAL '60 MINUTES') * 1000)::bigint AND
+         WHERE  s.analyticstime >= (extract (epoch from now() - INTERVAL '180 MINUTES') * 1000)::bigint AND
                 s.policydisposition = 2
          ) AND
          a.sourcenumber NOT IN
